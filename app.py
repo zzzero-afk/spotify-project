@@ -13,10 +13,16 @@ COL_ARTIST = "artist_name"   # 歌手欄位
 COL_GENRE  = "artist_genres"         # 曲風欄位
 
 # ── 讀取資料 ──────────────────────────────────────────────
-@st.cache_data  # 快取資料，避免每次互動都重新讀檔
+@st.cache_data
 def load_data():
-    df = pd.read_csv("spotify_data.csv")
-    df = df[[COL_TRACK, COL_ARTIST, COL_GENRE]].dropna()  # 只保留需要的欄位並移除空值
+    import os
+    # 1. 自動獲取當前 app.py 所在的資料夾絕對路徑
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # 2. 把資料夾路徑與檔名完美結合，確保程式永遠不會迷路
+    file_path = os.path.join(current_dir, "spotify_data.csv")
+    
+    # 3. 讀取絕對路徑，並加上編碼防護盾，徹底解決 Excel 污染問題
+    df = pd.read_csv(file_path, encoding="utf-8-sig")
     return df
 
 df = load_data()
@@ -55,7 +61,12 @@ def get_unique_artist_pool(dataframe, keywords):
     pattern = "|".join(keywords)
     mask = dataframe[COL_GENRE].str.contains(pattern, case=False, na=False)
     filtered = dataframe[mask]
-    return filtered.drop_duplicates(subset=[COL_ARTIST])
+    
+    # ⚡ 破解 Excel 固定順序的關鍵：在去重前，先將撈出來的歌曲大洗牌！
+    filtered_shuffled = filtered.sample(frac=1, random_state=random.randint(0, 9999)).reset_index(drop=True)
+    
+    # 洗牌後再留第一首，這樣每次留下來的代表作就絕對不一樣了！
+    return filtered_shuffled.drop_duplicates(subset=[COL_ARTIST])
 
 def build_surprise_playlist(df, tag, total):
     """80/20 法則：80% 主題曲 + 20% 跨領域驚喜曲"""
@@ -117,7 +128,7 @@ else:
         |---|---|
         | 同歌手可能連續出現 | 每位歌手僅出現一次 |
         | 只播你選的類型 | 80%主題+20%驚喜 |
-        | 偽隨機，有聚類偏誤 | 去重後真隨機取樣 |
+        | 有聚類偏誤 | 去重後真隨機取樣 |
         """)
         
     with st.sidebar.expander("### 📊 數據來源與素材", expanded=True):
